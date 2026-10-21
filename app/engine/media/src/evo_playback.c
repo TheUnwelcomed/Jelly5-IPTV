@@ -819,6 +819,7 @@ double evo_pb_duration_s(void)      { return media_duration_sec; }
 volatile double evo_av_offset_s = 0.0;
 void evo_pb_set_av_offset(double seconds) { evo_av_offset_s = seconds; }
 double evo_pb_audio_clock_s(void)   { return (double)audio_clock_seconds; }
+double evo_pb_audio_clock_shift_s(void) { return (double)audio_clock_shift / 48000.0; }   /* JELLY5_AVCLOCK_V1 */
 double evo_pb_video_clock_s(void)   { return video_clock_seconds; }
 double evo_pb_video_fps(void)       { return video_fps; }
 int evo_pb_active_backend(void)     { return (int)evo_vdec_active(g_vdec); }

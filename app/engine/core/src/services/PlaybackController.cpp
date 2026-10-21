@@ -519,6 +519,7 @@ void PlaybackController::stopPlayback() {
      * second file never plays at all.
      */
     audio_samples_played = 0;
+    audio_clock_shift = 0;   /* JELLY5_AVCLOCK_V1 */
     audio_samples_decoded = 0;
     audio_clock_seconds = 0.0;
     audio_pts_seconds = 0.0;
