@@ -1443,6 +1443,11 @@ extern "C" void nuvio_player_run(const char *json)
                     evo_demux_rebuffer(live_cushion_us(s), 8000);
                 else
                     evo_demux_rebuffer(kRefillUs[std::min(s.rebuffers, 2)], 20000);
+                /* JELLY5_AVDIAG_V1: the starvation itself, with both clocks as it begins */
+                evo_bt("nuvio: utc=%lld starving at pos=%.1f (video queue empty %.2f s) - rebuffer #%d; vclk=%.2f aclk=%.2f av=%+.2f buf=%.1fs",
+                       (long long)std::time(nullptr), s.st.position, now - s.vq_empty_since, s.rebuffers + 1,
+                       evo_pb_video_clock_s(), evo_pb_audio_clock_s(), evo_pb_video_clock_s() - evo_pb_audio_clock_s(),
+                       evo_demux_buffered_s());
                 s.rebuffers++;
                 s.last_rebuffer_at = now;
                 s.vq_empty_since = 0;
@@ -1615,17 +1620,23 @@ extern "C" void nuvio_player_run(const char *json)
             last_report = now;
             report_progress(s);
         }
-#ifdef JELLY5_LOG_HOST   /* dev builds: the engine's state every 5 s */
+#if defined(JELLY5_LOG_HOST) || defined(JELLY5_AVDIAG)   /* dev / diagnostic builds: the engine's state every 5 s */
         if (now - last_diag >= 5.0 && engine_ready) {
             last_diag = now;
             int vq = 0, aq = 0, ab = 0;
             evo_pb_queue_depth(&vq, &aq, &ab);
-            evo_bt("nuvio: pos=%.1f/%.1f paused=%d buffering=%d vq=%d aq=%d ab=%d buf=%.1fs demux=%d eof=%d ringfb=%lu vpk=%d vfr=%d ctl=%u/%d vclk=%.2f aclk=%.2f",
+            /* JELLY5_AVDIAG_V1: utc= is the console's wall clock (epoch seconds) so the line can be
+             * put next to the server's logs; av= is the picture's clock minus the sound's — a
+             * constant other than ~0 is the offset the viewer sees. */
+            evo_bt("nuvio: utc=%lld pos=%.1f/%.1f paused=%d buffering=%d vq=%d aq=%d ab=%d buf=%.1fs demux=%d eof=%d ringfb=%lu vpk=%d vfr=%d ctl=%u/%d vclk=%.2f aclk=%.2f av=%+.2f clkshift=%+.2f rebuffers=%d retries=%d",
+                   (long long)std::time(nullptr),
                    s.st.position, s.st.duration, (int)s.st.paused, (int)s.st.buffering, vq, aq, ab,
                    evo_demux_buffered_s(), evo_demux_state, evo_pb_is_eof(),
                    (unsigned long)packet_queue_ring_fallbacks,
                    dbg_video_packets, dbg_video_frames, nuvio_control_beats, nuvio_control_stage,
-                   evo_pb_video_clock_s(), evo_pb_audio_clock_s());
+                   evo_pb_video_clock_s(), evo_pb_audio_clock_s(),
+                   evo_pb_video_clock_s() - evo_pb_audio_clock_s(), evo_pb_audio_clock_shift_s(),
+                   s.rebuffers, s.drop_retries);
             evo_log_alloc_state("play");
         }
 #else

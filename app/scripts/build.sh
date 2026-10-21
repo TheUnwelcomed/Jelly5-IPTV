@@ -159,6 +159,7 @@ JELLY5_DEFS="-DJELLY5_VERSION=\\\"$(python3 -c 'import json,sys;print(json.load(
 [[ -n "${JF_URL}" ]] && JELLY5_DEFS+=" -DJELLY5_SERVER=\\\"${JF_URL}\\\""
 [[ -n "${SEERR_URL}" ]] && JELLY5_DEFS+=" -DJELLY5_SEERR_URL=\\\"${SEERR_URL}\\\""
 (( AV1_ON )) && JELLY5_DEFS+=" -DJELLY5_AV1=1"
+[[ -n "${JELLY5_AVDIAG:-}" ]] && JELLY5_DEFS+=" -DJELLY5_AVDIAG=1"   # JELLY5_AVDIAG_V1: diagnostic log on the console
 # JELLY5_REMOTE_LOG=1: a remote test build (issue #12), raw remote samples in
 # /download0/jelly5/remote-log.txt.
 [[ -n "${JELLY5_REMOTE_LOG:-}" ]] && JELLY5_DEFS+=" -DJELLY5_REMOTE_LOG=1"
