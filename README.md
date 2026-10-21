@@ -1,6 +1,4 @@
-Here’s a redesigned README for your fork. It keeps the original structure and screenshots while making the Live TV / higher-latency improvements the clear focus of the project.
-  
-  A native Jellyfin and Emby client for jailbroken PS5 consoles.
+A native Jellyfin and Emby client for jailbroken PS5 consoles.
   GPU-drawn interface, hardware-decoded 4K HDR, and improved Live TV performance on higher-latency paths.
 
 
