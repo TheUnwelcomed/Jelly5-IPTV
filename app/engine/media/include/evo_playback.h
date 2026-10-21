@@ -41,6 +41,8 @@ void   evo_pb_reset_decode_fatal(void); /* clear fatal flag + streak (re-open) *
 double evo_pb_position_s(void);       /* audio-preferred media clock         */
 double evo_pb_duration_s(void);
 double evo_pb_audio_clock_s(void);
+double evo_pb_audio_clock_shift_s(void);   /* JELLY5_AVDIAG_V1: seconds the sound's timestamps jumped by, in the clock */
+double evo_pb_av_s(void);   /* JELLY5_AVDIAG_V1: the picture minus the sound as the gate reads them, s (< 0: picture behind) */
 void   evo_pb_set_av_offset(double seconds);  /* Jelly5: audio delay, s (>0: sound arrives late) */
 double evo_pb_video_clock_s(void);    /* raw video presentation clock (s)    */
 long long evo_pb_video_keys_sent(void); /* keyframes handed to the decoder */

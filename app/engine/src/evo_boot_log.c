@@ -17,6 +17,20 @@ extern int sceKernelSendNotificationRequest(int, void *, unsigned long, int);
 #endif
 
 #define EVO_LOG_PATH "/mnt/usb0/evo.log"
+/*
+ * JELLY5_AVDIAG_V1 — a diagnostic build: the log goes to a file in the app's own
+ * folder tree on the console (/data/evoplayer; fetch it over FTP), so the
+ * player's clocks can be read after a live-TV freeze or desync. Not for a
+ * release build: the file grows for as long as the app runs (~100 KB an hour).
+ */
+#ifdef JELLY5_AVDIAG
+#undef EVO_LOG_PATH
+/* /data/evoplayer is where the engine keeps its own files; an FTP server on the
+ * console reaches it (the app's /download0 is a mount only the app sees). */
+#define EVO_LOG_PATH "/data/evoplayer/jelly5-diag.log"
+#define EVO_LOG_TO_USB 1
+int evo_mkdir(const char *path);   /* evo_data_path.c (sceKernelMkdir in the app module) */
+#endif
 
 /*
  * Two phases:
@@ -318,6 +332,9 @@ void evo_boot_log_flush(void)
 {
     if (!g_fp) {
 #ifdef EVO_LOG_TO_USB
+#ifdef JELLY5_AVDIAG
+        evo_mkdir("/data/evoplayer");
+#endif
         FILE *fp = fopen(EVO_LOG_PATH, "a");
 #else
         FILE *fp = NULL;   /* Jelly5: never a file on the viewer's USB stick (dev builds log over UDP) */

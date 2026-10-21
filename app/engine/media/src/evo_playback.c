@@ -888,6 +888,15 @@ double evo_pb_duration_s(void)      { return media_duration_sec; }
 volatile double evo_av_offset_s = 0.0;
 void evo_pb_set_av_offset(double seconds) { evo_av_offset_s = seconds; }
 double evo_pb_audio_clock_s(void)   { return (double)audio_clock_seconds; }
+double evo_pb_audio_clock_shift_s(void) { return (double)audio_clock_shift / 48000.0; }   /* JELLY5_AVDIAG_V1 */
+/* JELLY5_AVDIAG_V1: video_rel - audio_rel of decode_next_video_frame(). The raw clocks do
+ * not compare: the picture's is its timestamp, the sound's starts from 0 at an open or seek. */
+double evo_pb_av_s(void)
+{
+    if (first_video_pts_seconds < 0.0)
+        return 0.0;
+    return (video_clock_seconds - first_video_pts_seconds) - ((double)audio_clock_seconds - evo_av_offset_s);
+}
 double evo_pb_video_clock_s(void)   { return video_clock_seconds; }
 long long evo_pb_video_keys_sent(void) { return video_keys_sent; }
 long long evo_pb_video_late_skips(void) { return video_late_skips; }   /* JELLY5_AVLATE_V1 */
