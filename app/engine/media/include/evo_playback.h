@@ -44,6 +44,8 @@ double evo_pb_audio_clock_s(void);
 double evo_pb_audio_clock_shift_s(void);   /* JELLY5_AVCLOCK_V1: seconds the sound's timestamps jumped by, in the clock */
 void   evo_pb_set_av_offset(double seconds);  /* Jelly5: audio delay, s (>0: sound arrives late) */
 double evo_pb_video_clock_s(void);    /* raw video presentation clock (s)    */
+long long evo_pb_video_late_skips(void); /* JELLY5_AVLATE_V1: pictures skipped as late */
+long long evo_pb_video_keys_sent(void);  /* JELLY5_HWWATCH_V1: keyframes handed to the decoder */
 double evo_pb_video_fps(void);        /* 0 until a stream is open            */
 void   evo_pb_queue_depth(int *vpkts, int *apkts, int *ablocks);  /* debug overlay */
 int    evo_pb_active_backend(void);   /* evo_vdec_backend of the live decoder */

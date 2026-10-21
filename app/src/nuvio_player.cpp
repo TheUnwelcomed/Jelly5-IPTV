@@ -429,6 +429,7 @@ struct Session {
     double wd_since = 0;              /* hardware decoder watchdog */
     int wd_frames = -1;
     int wd_consumed = 0;
+    long long wd_keys = 0;            /* JELLY5_HWWATCH_V1: keyframes handed over when the watch began */
         double vq_empty_since = 0;        /* underrun watch */
     int rebuffers = 0;
     double last_rebuffer_at = -1e9;
@@ -1464,10 +1465,20 @@ extern "C" void nuvio_player_run(const char *json)
                     s.wd_frames = dbg_video_frames;
                     s.wd_consumed = consumed;
                     s.wd_since = now;
+                    s.wd_keys = evo_pb_video_keys_sent();
                 }
+                /* JELLY5_HWWATCH_V1: a hardware decoder that has been given no
+                 * keyframe since its last picture is not silent, it is waiting -
+                 * a reconnect lands in the middle of a GOP, and on a feed that
+                 * keeps pausing the next keyframe can be more than 6 s away
+                 * (2026-10-19 01:34 and 01:36: two "returns no pictures" reopens
+                 * on BOOMERANG, each a restart from zero for the viewer). Only a
+                 * decoder that was handed a keyframe and still shows nothing in
+                 * 6 s is reopened on the software decoder. */
                 if (!g_vdec_force_ffmpeg && evo_pb_active_backend() == EVO_VDEC_BACKEND_NATIVE &&
                     (evo_pb_decode_fatal() ||
-                     (watch && now - s.wd_since > 6.0 && consumed - s.wd_consumed > 36))) {
+                     (watch && now - s.wd_since > 6.0 && consumed - s.wd_consumed > 36 &&
+                      evo_pb_video_keys_sent() > s.wd_keys))) {
                     reopen_software(s, evo_pb_decode_fatal() ? "gave up" : "returns no pictures");
                     continue;
                 }
@@ -1628,7 +1639,7 @@ extern "C" void nuvio_player_run(const char *json)
             /* JELLY5_AVDIAG_V1: utc= is the console's wall clock (epoch seconds) so the line can be
              * put next to the server's logs; av= is the picture's clock minus the sound's — a
              * constant other than ~0 is the offset the viewer sees. */
-            evo_bt("nuvio: utc=%lld pos=%.1f/%.1f paused=%d buffering=%d vq=%d aq=%d ab=%d buf=%.1fs demux=%d eof=%d ringfb=%lu vpk=%d vfr=%d ctl=%u/%d vclk=%.2f aclk=%.2f av=%+.2f clkshift=%+.2f rebuffers=%d retries=%d",
+            evo_bt("nuvio: utc=%lld pos=%.1f/%.1f paused=%d buffering=%d vq=%d aq=%d ab=%d buf=%.1fs demux=%d eof=%d ringfb=%lu vpk=%d vfr=%d ctl=%u/%d vclk=%.2f aclk=%.2f av=%+.2f clkshift=%+.2f rebuffers=%d retries=%d lateskip=%lld",
                    (long long)std::time(nullptr),
                    s.st.position, s.st.duration, (int)s.st.paused, (int)s.st.buffering, vq, aq, ab,
                    evo_demux_buffered_s(), evo_demux_state, evo_pb_is_eof(),
@@ -1636,7 +1647,7 @@ extern "C" void nuvio_player_run(const char *json)
                    dbg_video_packets, dbg_video_frames, nuvio_control_beats, nuvio_control_stage,
                    evo_pb_video_clock_s(), evo_pb_audio_clock_s(),
                    evo_pb_video_clock_s() - evo_pb_audio_clock_s(), evo_pb_audio_clock_shift_s(),
-                   s.rebuffers, s.drop_retries);
+                   s.rebuffers, s.drop_retries, (long long)evo_pb_video_late_skips());   /* JELLY5_AVLATE_V1 */
             evo_log_alloc_state("play");
         }
 #else

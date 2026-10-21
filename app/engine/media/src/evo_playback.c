@@ -32,6 +32,7 @@
 #include "evo_demux.h"
 #include "evo_audio_out.h"
 #include "evo_direct_mem.h"
+#include "evo_boot_trace.h"   /* JELLY5_AVLATE_V1: one line per catch-up */
 
 #ifndef SCREEN_PLAYER
 #define SCREEN_PLAYER 2
@@ -72,6 +73,11 @@ pp_aspect_mode prospero_view_mode_to_aspect(void);
  * ------------------------------------------------------------------------ */
 double first_video_pts_seconds = -1.0;
 double video_clock_seconds = 0.0;
+/* JELLY5_AVLATE_V1: pictures not shown because they were late against the sound */
+volatile long long video_late_skips = 0;
+/* JELLY5_HWWATCH_V1: keyframes handed to the decoder (a silent hardware decoder that
+ * has not been given one yet is waiting, not broken) */
+volatile long long video_keys_sent = 0;
 double video_fps = 60.0;
 int    video_decode_ready = 0;
 int    video_decode_done = 0;
@@ -517,6 +523,13 @@ static void prospero_video_queue_drain_nonkey(int max_packets)
 
 
 
+static double evo_mono_s(void)   /* JELLY5_AVLATE_V2 */
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
+
 int decode_next_video_frame(void)
 {
     if (!video_decode_ready || player_paused) return 0;
@@ -635,6 +648,58 @@ int decode_next_video_frame(void)
                  * at presentation time; dropping demux packets breaks decoder GOP integrity. */
                 if (behind > 0.45 && !g_pp_pb.active)
                     prospero_video_queue_drain_nonkey(24);
+                /*
+                 * JELLY5_AVLATE_V1. Below the drain threshold a late picture was
+                 * simply shown, and the presentation clock after this gate runs
+                 * on wall time, so after a stall, a skip or a rebuffer hold the
+                 * picture settled a few tenths of a second behind the sound and
+                 * stayed there (2026-10-18: -0.43 s for 18 minutes after a
+                 * reconnect; -0.4 to -0.9 s after rebuffers the day before). A
+                 * picture late by more than LATE_SKIP_S is not shown: the next
+                 * one is decoded at once, so the picture catches up within a few
+                 * frames instead of never. At most LATE_SKIP_MAX in a row, so a
+                 * sound clock that runs away cannot blank the picture.
+                 */
+                /*
+                 * JELLY5_AVLATE_V2. The sound clock advances when a block is
+                 * handed to the port, and the port takes several at once, so
+                 * the clock steps forward in bursts of up to ~0.2 s and stands
+                 * still between them (2026-10-19 01:33, 60 fps HE-AAC: the gate
+                 * read 0.10-0.11 s late once every ~6 frames and skipped a frame
+                 * each time, 10 a second, with the picture in sync). A picture
+                 * counts as late only when it has read late without a break for
+                 * LATE_SKIP_HOLD_S - longer than a burst period - so the steps
+                 * never trip it, while a real offset (always late) does.
+                 */
+                #define LATE_SKIP_S      0.15
+                #define LATE_SKIP_HOLD_S 0.35
+                #define LATE_SKIP_MAX    12
+                {
+                    static int s_streak = 0;
+                    static double s_worst = 0.0;
+                    static double s_late_since = -1.0;
+                    const double now_mono = evo_mono_s();
+                    if (behind > LATE_SKIP_S) {
+                        if (s_late_since < 0.0)
+                            s_late_since = now_mono;
+                    } else {
+                        s_late_since = -1.0;
+                    }
+                    if (behind > LATE_SKIP_S && s_streak < LATE_SKIP_MAX &&
+                        (s_streak > 0 || now_mono - s_late_since >= LATE_SKIP_HOLD_S)) {
+                        s_streak++;
+                        video_late_skips++;
+                        if (behind > s_worst)
+                            s_worst = behind;
+                        return 1;              /* the frame stays unshown; the next call decodes the next */
+                    }
+                    if (s_streak) {
+                        evo_bt("nuvio: picture was %.2f s behind the sound - %d frame(s) skipped to catch up (now %+.2f s)",
+                               s_worst, s_streak, -behind);
+                        s_streak = 0;
+                        s_worst = 0.0;
+                    }
+                }
             } else if (video_fps > 1.0 && !g_pp_pb.active) {
                 /*
                  * Audio not running yet: pace by nominal frame interval so
@@ -753,6 +818,8 @@ int decode_next_video_frame(void)
                                      video_video_pending_pkt->size, send_pts_us);
 
         if (send_ret == 0) {
+            if (video_video_pending_pkt->flags & AV_PKT_FLAG_KEY)
+                video_keys_sent++;                              /* JELLY5_HWWATCH_V1 */
             av_packet_free(&video_video_pending_pkt);
             continue;
         }
@@ -821,6 +888,8 @@ void evo_pb_set_av_offset(double seconds) { evo_av_offset_s = seconds; }
 double evo_pb_audio_clock_s(void)   { return (double)audio_clock_seconds; }
 double evo_pb_audio_clock_shift_s(void) { return (double)audio_clock_shift / 48000.0; }   /* JELLY5_AVCLOCK_V1 */
 double evo_pb_video_clock_s(void)   { return video_clock_seconds; }
+long long evo_pb_video_late_skips(void) { return video_late_skips; }   /* JELLY5_AVLATE_V1 */
+long long evo_pb_video_keys_sent(void)  { return video_keys_sent; }    /* JELLY5_HWWATCH_V1 */
 double evo_pb_video_fps(void)       { return video_fps; }
 int evo_pb_active_backend(void)     { return (int)evo_vdec_active(g_vdec); }
 
