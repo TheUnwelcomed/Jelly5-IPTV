@@ -1,37 +1,43 @@
-<p align="center">
-  <img src="docs/media/icon.png" alt="Jelly5" width="180"><br>
-  <b>A native Jellyfin and Emby client for jailbroken PS5 consoles.</b><br>
-  Its own GPU-drawn interface, hardware-decoded 4K HDR playback, and no browser in between.
-</p>
+Here’s a redesigned README for your fork. It keeps the original structure and screenshots while making the Live TV / higher-latency improvements the clear focus of the project.
+  
+  A native Jellyfin and Emby client for jailbroken PS5 consoles.
+  GPU-drawn interface, hardware-decoded 4K HDR, and improved Live TV performance on higher-latency paths.
 
-<p align="center">
-  <img alt="Platform: PS5" src="https://img.shields.io/badge/platform-PS5%20(jailbroken)-4b5bdc">
-  <img alt="Jellyfin" src="https://img.shields.io/badge/Jellyfin-client-7b5cd6">
-  <img alt="Emby" src="https://img.shields.io/badge/Emby-client-52b54b">
-  <img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-555">
-  <img alt="Status: early" src="https://img.shields.io/badge/status-early%20release-c06">
-</p>
 
-<p align="center">
-  <img src="docs/media/screenshot-home.webp" alt="Jelly5's home screen: a featured series' backdrop, logo and overview, with Play and More Info" width="100%">
-</p>
 
-<table>
-  <tr>
-    <td width="33%"><img src="docs/media/screenshot-movies.webp" alt="The Movies library"></td>
-    <td width="33%"><img src="docs/media/screenshot-shows.webp" alt="The TV Shows library"></td>
-    <td width="33%"><img src="docs/media/screenshot-search.webp" alt="Search with the on-screen keyboard and suggestions"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Movies</sub></td>
-    <td align="center"><sub>TV Shows</sub></td>
-    <td align="center"><sub>Search</sub></td>
-  </tr>
-</table>
+  ￼
+  ￼
+  ￼
+  ￼
+  ￼
 
-Jelly5 brings your Jellyfin or Emby library to the PS5 as a real app: a fast, sharp interface made for the TV, and 4K HDR video played by the console's own hardware. With [Seerr](https://github.com/seerr-team/seerr), you can also request new films and series without leaving the couch.
 
-**Contents:** [Features](#features) · [Installation](#installation) · [Controls](#controls) · [Emby](#emby) · [Seerr](#seerr-optional) · [Formats and limits](#formats-and-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Building](#building) · [Credits](#credits)
+
+  
+
+
+
+  
+    
+
+    
+
+    
+
+  
+  
+    
+Movies
+    
+TV Shows
+    
+Search
+  
+
+
+This is a fork of [Jelly5](https://github.com/02dnot/Jelly5) focused on making **Live TV** more reliable on higher-latency or bandwidth-constrained paths. It keeps the same native PS5 experience (liquid-glass UI, hardware 4K HDR, Seerr support) while adding measured fixes for TCP buffering, A/V desync after drops, and presentation-clock recovery.
+
+**Contents:** [Features](#features) · [Live TV improvements](#live-tv-improvements) · [Installation](#installation) · [Controls](#controls) · [Emby](#emby) · [Seerr](#seerr-optional) · [Formats and limits](#formats-and-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Building](#building) · [Credits](#credits)
 
 ## Features
 
@@ -40,7 +46,7 @@ Jelly5 brings your Jellyfin or Emby library to the PS5 as a real app: a fast, sh
 - Title pages with logo art, cast, seasons and episodes, trailers, extras and theme music
 - Movie, TV and music libraries with sorting, filters and A–Z jumping, and search across everything
 - Several users and servers, a screensaver from your own backdrops, and a liquid-glass look throughout
-- In all 27 of the PS5's system languages, following the PS5's language (or a choice in Settings): English, Norwegian, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Danish, Finnish, Polish, Czech, Hungarian, Romanian, Greek, Russian, Ukrainian, Turkish, Arabic, Japanese, Korean, Chinese (Traditional and Simplified), Thai, Vietnamese and Indonesian
+- In all 27 of the PS5's system languages
 
 **Playback**
 - Hardware-decoded H.264 and HEVC up to 4K with HDR10 and HLG; direct play where the PS5 can, server transcoding where it can't
@@ -71,6 +77,17 @@ Jelly5 brings your Jellyfin or Emby library to the PS5 as a real app: a fast, sh
 **Requests with Seerr** (optional)
 - Search, request and track films and series, a *Discover* tab, and trailers as a QR code for your phone
 
+## Live TV improvements
+
+This fork adds a small set of targeted patches (see [`IPTV-PATCHES.md`](IPTV-PATCHES.md)) that address real problems when Live TV travels over higher-latency links:
+
+- **Larger TCP receive buffer** — The console’s default ~128 KB window caps throughput at roughly window/RTT. On a ~130 ms path this limited a connection to ~8 Mbit/s and caused the player to fall behind. A 1 MB buffer raises the ceiling substantially (FFmpeg applies it before connect so window scaling is negotiated). Applied to both the main player connection and connections the demuxer opens itself (HLS segments).
+- **A/V clock recovery after drops or timestamp jumps** — After a dropped connection the sound clock could leave the picture frozen for 7–14 seconds. The sound clock now follows jumps in the sound timestamps so picture and sound resync quickly.
+- **Late-frame handling and presentation re-anchoring** — Pictures that arrive late relative to sound are skipped so the picture can catch up. The presentation timeline re-anchors when a frame is far early or far late instead of throttling or dropping a long run of frames.
+- **Optional diagnostic logging** — Build with `JELLY5_AVDIAG=1` to get engine logs with both clocks on the console for diagnosing freezes or desyncs after the fact. Off by default and not intended for release builds.
+
+Everything else is unchanged from upstream Jelly5. The patches are small, measured, and confined to the media engine.
+
 ## Installation
 
 ### What you need
@@ -88,7 +105,7 @@ Jelly5 brings your Jellyfin or Emby library to the PS5 as a real app: a fast, sh
 
 ### Install
 
-1. Download `Jelly5-<version>.zip` from the [latest release](../../releases/latest) and unzip it. Inside is a folder called `PPSA99505`.
+1. Download `Jelly5-.zip` from the [latest release](../../releases/latest) and unzip it. Inside is a folder called `PPSA99505`.
 2. Start the jailbreak with ShadowMount+ (and your FTP server, if you use FTP).
 3. Upload the `PPSA99505` folder to `/data/homebrew/` on the console, so that `/data/homebrew/PPSA99505/eboot.bin` exists. Create `/data/homebrew` first if it isn't there.
 4. After a moment, ShadowMount+ adds a **Jelly5** tile under *Media* on the home screen. If it doesn't, run your payloads again, or reboot and jailbreak again.
@@ -126,7 +143,7 @@ Close Jelly5 and delete `/data/homebrew/PPSA99505`. Its accounts, settings and i
 
 With HDMI Device Link on the PS5 and CEC on the TV, the TV remote works too: OK is ✕ and Back is ○.
 
-In the Live TV guide, ✕ on what's on now watches the channel, ✕ on a later programme offers to record it, and Options opens the same choices on anything (also on a channel). ○ goes back to now, then to the top To jump days, press L2/R2, or go up from the channel column to the day (‹ I dag ›) and press ←/→.
+In the Live TV guide, ✕ on what's on now watches the channel, ✕ on a later programme offers to record it, and Options opens the same choices on anything (also on a channel). ○ goes back to now, then to the top. To jump days, press L2/R2, or go up from the channel column to the day (‹ I dag ›) and press ←/→.
 
 ## Emby
 
@@ -166,7 +183,7 @@ Once signed in, Seerr's results appear in Search, a *Discover* tab shows what's 
 | Audio | AAC, AC3, E-AC3, TrueHD, DTS (incl. DTS-HD MA), FLAC, Opus, MP3 and more | Played as multichannel PCM; with *HDMI bitstream* on, Dolby Digital, Dolby Digital Plus and DTS go to the TV/receiver as they are (TrueHD and DTS-HD MA stay lossless PCM) |
 | Subtitles | SRT, ASS/SSA, PGS, DVD and DVB, WebVTT | Embedded or external |
 | Containers | MKV, MP4, TS/M2TS, AVI and more | No Blu-ray folders or ISO files |
-| Live TV | Channels from the server's tuners (IPTV/M3U, HDHomeRun) as MPEG-TS or HLS | Played directly where the PS5 can; interlaced (1080i, 576i) and MPEG-2 channels are deinterlaced and converted by the server. No pausing back in time (timeshift) |
+| Live TV | Channels from the server's tuners (IPTV/M3U, HDHomeRun) as MPEG-TS or HLS | Played directly where the PS5 can; interlaced (1080i, 576i) and MPEG-2 channels are deinterlaced and converted by the server. No pausing back in time (timeshift). Higher-latency paths benefit from the receive-buffer and clock-recovery patches in this fork. |
 
 Limits of the platform, not of Jelly5:
 
@@ -183,13 +200,13 @@ Limits of the platform, not of Jelly5:
 | The upload fails ("Text file busy") | Jelly5 is still running: close it first. |
 | Your server isn't listed | Type its address. Discovery needs UDP port 7359; in Docker, publish `7359/udp`, and in Jellyfin turn on *Enable auto discovery*. |
 | No previews when scrubbing | The server makes them. Jellyfin: turn on *Enable trickplay image extraction* in the library and run *Generate Trickplay Images*. Emby: turn on *Thumbnail image extraction*. |
-| A title won't play or stutters | Press **L3** while it plays and include that info in an issue. Over Wi-Fi, lower *Maximum quality* in the settings. |
+| A title won't play or stutters | Press **L3** while it plays and include that info in an issue. Over Wi-Fi, lower *Maximum quality* in the settings. For Live TV freezes or desync on higher-latency paths, the patches in this fork address the most common cases; rebuild with `JELLY5_AVDIAG=1` if you need clock logs. |
 | The receiver shows PCM, not Dolby or Atmos | Turn on *Settings → HDMI bitstream* (and night mode off). TrueHD and DTS-HD MA always play as PCM: see *Formats and limits*. |
 | Seerr isn't answering | Use Seerr's local address (port 5055 by default) and check it with *Test connection*. |
 | Seerr's automatic sign-in fails | Seerr is older than 3.4, Quick Connect is off in Jellyfin, or your user isn't in Seerr. Use your password instead, or import the user. |
 | Seerr shows no pictures | Seerr fetches them from TMDB, so the Seerr server needs internet access. |
 
-**Reporting a problem:** open an issue with your firmware, your server and its version, what you did and what happened. For playback problems, the L3 playback info helps a lot.
+**Reporting a problem:** open an issue with your firmware, your server and its version, what you did and what happened. For playback problems, the L3 playback info helps a lot. For Live TV issues on higher-latency paths, note the approximate RTT and whether the problem is buffering, freezes after drops, or A/V desync.
 
 ## Privacy
 
@@ -206,44 +223,30 @@ Jelly5 builds on macOS (Apple silicon or Intel) and Linux with the [PS5 payload 
 scripts/setup-toolchain.sh                  # once: SDK, pacbrew sysroot, host zlib, AV1 (dav1d + FFmpeg 7.1)
 cd app
 eval "$(../scripts/setup-toolchain.sh --env)"
-scripts/build.sh --release                  # → build/app/Jelly5-<version>.zip
-```
-
-On macOS, run the build with Homebrew's bash: `"$(brew --prefix)/bin/bash" scripts/build.sh`.
-
-A plain `scripts/build.sh` is a development build: it reads the git-ignored `.env.local` (`JF_URL`, `PS5_HOST`, …), uses `JF_URL` as the default server, and sends a debug log over UDP to the build machine (`scripts/log.sh`). `scripts/deploy.py` uploads it to the console over FTP.
-
-Tests run on the build machine (they need libcurl's headers: `libcurl4-openssl-dev` on Debian/Ubuntu, included with macOS):
-
-- `app/tests/host/run.sh`: the client against your Jellyfin server (`JF_URL`, `JF_USER`, `JF_PASS` in `.env.local`); `run.sh emby` against Emby (`EMBY_URL`, `EMBY_USER`, `EMBY_PASS`)
-- `app/tests/host/seerr.sh`: the Seerr client (`SEERR_URL`); it sends no request unless given `--for-real`
-- `app/tests/host/routes.sh`: no server needed; checks that every Jellyfin request is the same as on `main`
-
-## Credits
-
+scripts/build.sh --release                  # → build/app/Jelly5-.zip
+On macOS, run the build with Homebrew’s bash: "$(brew --prefix)/bin/bash" scripts/build.sh.
+A plain scripts/build.sh is a development build: it reads the git-ignored .env.local (JF_URL, PS5_HOST, …), uses JF_URL as the default server, and sends a debug log over UDP to the build machine (scripts/log.sh). scripts/deploy.py uploads it to the console over FTP.
+To enable the optional Live TV diagnostic log: JELLY5_AVDIAG=1 scripts/build.sh.
+Tests run on the build machine (they need libcurl’s headers: libcurl4-openssl-dev on Debian/Ubuntu, included with macOS):
+	•	app/tests/host/run.sh: the client against your Jellyfin server (JF_URL, JF_USER, JF_PASS in .env.local); run.sh emby against Emby (EMBY_URL, EMBY_USER, EMBY_PASS)
+	•	app/tests/host/seerr.sh: the Seerr client (SEERR_URL); it sends no request unless given --for-real
+	•	app/tests/host/routes.sh: no server needed; checks that every Jellyfin request is the same as on main
+Credits
 Jelly5 stands on the work of others in the PS5 scene and beyond:
-
-- **[Nuvio PS5](https://github.com/theghostonline/Nuvio-PS5)** by Husam Osman: the native player, its session and subtitle handling, and the app packaging toolkit
-- **[EVO Player](https://github.com/sainsaji/EVO-PLAYER-PS5)**: the media engine (demuxing, `sceVideodec2`, the AGC renderer, audio, HDR), shader tooling and much of what is known about the PS5's GPU from user space
-- **[ps5-payload-dev SDK](https://github.com/ps5-payload-dev/sdk)** by John Törnblom and contributors, plus the pacbrew sysroot
-- **[Jelly5-Seerr](https://github.com/viviandsx/Jelly5-Seer)** by [@viviandsx](https://github.com/viviandsx): the Seerr integration (client, search, requests, Discover) and the Linux build. Thank you!
-- **[Switchfin](https://github.com/dragonflylee/switchfin)**, a reference for the Jellyfin API
-- **[OverShifted/LiquidGlass](https://github.com/OverShifted/LiquidGlass)** (MIT), whose refraction profile the glass shader follows
-- [FFmpeg](https://ffmpeg.org), [libass](https://github.com/libass/libass), FreeType, HarfBuzz, [cJSON](https://github.com/DaveGamble/cJSON), [NanoSVG](https://github.com/memononen/nanosvg), [QR Code generator](https://www.nayuki.io/page/qr-code-generator-library) by Project Nayuki, the [Unicode CLDR](https://cldr.unicode.org) (dates and language names), and the Inter, Roboto and Noto typefaces
-- The [Jellyfin](https://jellyfin.org) project, [Seerr](https://github.com/seerr-team/seerr), and [Emby](https://emby.media)'s API documentation ([Emby.SDK](https://github.com/MediaBrowser/Emby.SDK))
-
-Every component, its licence and where it is used are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
-
-## License
-
-Jelly5 is free software under the **GNU General Public License v3.0 or later** (see [`LICENSE`](LICENSE)). Code taken from Nuvio PS5, EVO Player and other projects keeps its original notices.
-
-## Disclaimer
-
-Jelly5 is an unofficial homebrew project, provided **as is, without any warranty** of any kind, express or implied, as set out in sections 15 and 16 of the GPL. **You use it entirely at your own risk.** The authors and contributors are not responsible or liable for any damage, data loss, malfunction, account or online-service consequences, or any other harm, to your console, your devices, your data or anything else, arising from installing, using or being unable to use it.
-
-Running homebrew requires a jailbroken console, which may break Sony's terms of service and void your warranty. Whether you do so is your choice and your responsibility.
-
+	•	Nuvio PS5 by Husam Osman: the native player, its session and subtitle handling, and the app packaging toolkit
+	•	EVO Player: the media engine (demuxing, sceVideodec2, the AGC renderer, audio, HDR), shader tooling and much of what is known about the PS5’s GPU from user space
+	•	ps5-payload-dev SDK by John Törnblom and contributors, plus the pacbrew sysroot
+	•	Jelly5-Seerr by @viviandsx: the Seerr integration (client, search, requests, Discover) and the Linux build. Thank you!
+	•	Switchfin, a reference for the Jellyfin API
+	•	OverShifted/LiquidGlass (MIT), whose refraction profile the glass shader follows
+	•	FFmpeg, libass, FreeType, HarfBuzz, cJSON, NanoSVG, QR Code generator by Project Nayuki, the Unicode CLDR (dates and language names), and the Inter, Roboto and Noto typefaces
+	•	The Jellyfin project, Seerr, and Emby’s API documentation (Emby.SDK)
+	•	Upstream Jelly5 by 02dnot
+Every component, its licence and where it is used are listed in THIRD_PARTY_NOTICES.md.
+License
+Jelly5 is free software under the GNU General Public License v3.0 or later (see LICENSE). Code taken from Nuvio PS5, EVO Player and other projects keeps its original notices.
+Disclaimer
+Jelly5 is an unofficial homebrew project, provided as is, without any warranty of any kind, express or implied, as set out in sections 15 and 16 of the GPL. You use it entirely at your own risk. The authors and contributors are not responsible or liable for any damage, data loss, malfunction, account or online-service consequences, or any other harm, to your console, your devices, your data or anything else, arising from installing, using or being unable to use it.
+Running homebrew requires a jailbroken console, which may break Sony’s terms of service and void your warranty. Whether you do so is your choice and your responsibility.
 Jelly5 contains no media and gives access to no content of its own: it plays what is on your own Jellyfin or Emby server. Use it only with media you have the right to watch.
-
-Jelly5 is not affiliated with or endorsed by Sony Interactive Entertainment, the Jellyfin project or Emby LLC. *PlayStation*, *PS5* and *DualSense* are trademarks of Sony Interactive Entertainment Inc. *Emby* is a trademark of Emby LLC.
+Jelly5 is not affiliated with or endorsed by Sony Interactive Entertainment, the Jellyfin project or Emby LLC. PlayStation, PS5 and DualSense are trademarks of Sony Interactive Entertainment Inc. Emby is a trademark of Emby LLC.
