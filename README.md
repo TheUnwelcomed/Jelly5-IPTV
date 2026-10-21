@@ -1,38 +1,6 @@
 A native Jellyfin and Emby client for jailbroken PS5 consoles.
   GPU-drawn interface, hardware-decoded 4K HDR, and improved Live TV performance on higher-latency paths.
-
-
-
-  ￼
-  ￼
-  ￼
-  ￼
-  ￼
-
-
-
   
-
-
-
-  
-    
-
-    
-
-    
-
-  
-  
-    
-Movies
-    
-TV Shows
-    
-Search
-  
-
-
 This is a fork of [Jelly5](https://github.com/02dnot/Jelly5) focused on making **Live TV** more reliable on higher-latency or bandwidth-constrained paths. It keeps the same native PS5 experience (liquid-glass UI, hardware 4K HDR, Seerr support) while adding measured fixes for TCP buffering, A/V desync after drops, and presentation-clock recovery.
 
 **Contents:** [Features](#features) · [Live TV improvements](#live-tv-improvements) · [Installation](#installation) · [Controls](#controls) · [Emby](#emby) · [Seerr](#seerr-optional) · [Formats and limits](#formats-and-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Building](#building) · [Credits](#credits)
