@@ -230,6 +230,19 @@ void evo_stream_io_apply_network_options(AVDictionary **opts, const char *url)
     av_dict_set(opts, "reconnect_delay_max", "2", 0);
     av_dict_set(opts, "rw_timeout", "5000000", 0);
     av_dict_set(opts, "timeout", "5000000", 0);
+    /*
+     * A bigger TCP receive buffer (JELLY5_RCVBUF_V1). The console's default is
+     * about 128 KB, and a TCP connection can carry no more than that per round
+     * trip: over a 130-ms path that is 8 Mbit/s, under a 1080p channel, so the
+     * player fell behind and starved (Darryl's dock, 2026-10-17: the receiver's
+     * window stayed at 125 KB and the server sat stalled by it a third of the
+     * time, on every connection). FFmpeg sets SO_RCVBUF before it connects, so
+     * the window scale is negotiated for the new size; http hands this option
+     * through tls down to tcp. 1 MB raises the cap to about 65 Mbit/s. If the
+     * console refuses the size FFmpeg logs "setsockopt(SO_RCVBUF)" and keeps
+     * its default.
+     */
+    av_dict_set(opts, "recv_buffer_size", "1048576", 0);
 #ifdef NUVIO_APP
     /* Jelly5: a Jellyfin or Emby transcode (its HLS carries PlaySessionId) starts
      * over at the target of a seek, and the first segment from there comes only
