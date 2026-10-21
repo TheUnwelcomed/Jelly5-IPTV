@@ -216,6 +216,53 @@ char nuvio_stream_user_agent[512];
 int nuvio_stream_live;
 #endif
 
+/*
+ * JELLY5_RCVBUF_V2: the receive-buffer option on every connection a demuxer
+ * opens by itself. recv_buffer_size on the open's dictionary reaches only the
+ * connection avformat_open_input makes. FFmpeg's HLS demuxer opens each
+ * segment through the context's io_open with a dictionary of its own, copied
+ * from the playlist connection by ffio_copy_url_options, which carries only
+ * headers, user_agent, cookies, http_proxy, referer, rw_timeout and icy
+ * (libavformat/aviobuf.c, n7.1.1) - so a Jellyfin transcode's segments kept
+ * the console's 128 KB window and its 8 Mbit/s cap (Darryl's dock, 2026-10-18
+ * 06:35: window 126-128 KB on every segment connection, delivered <= 7.8
+ * Mbit/s, the sender stalled by the window on each of them) while the raw
+ * stream, opened directly, had 511 KB. This wrapper adds the option to every
+ * sub-open and hands the open to FFmpeg's default io_open. Local files take
+ * the same path; tcp ignores the option where it does not apply.
+ */
+static int (*sio_default_io_open)(struct AVFormatContext *s, AVIOContext **pb,
+                                  const char *url, int flags, AVDictionary **options);
+
+static int sio_io_open(struct AVFormatContext *s, AVIOContext **pb, const char *url,
+                       int flags, AVDictionary **options)
+{
+    AVDictionary *o = NULL;
+    if (options && *options)
+        av_dict_copy(&o, *options, 0);
+    av_dict_set(&o, "recv_buffer_size", "1048576", 0);
+    int ret = sio_default_io_open(s, pb, url, flags, &o);
+    if (options) {
+        /* FFmpeg leaves the options a protocol did not take in *options; keep
+         * that contract for the caller (the demuxer frees the dictionary). */
+        av_dict_free(options);
+        *options = o;
+    } else {
+        av_dict_free(&o);
+    }
+    return ret;
+}
+
+void evo_stream_io_install_io_open(struct AVFormatContext *fmt)
+{
+    if (!fmt || !fmt->io_open || fmt->io_open == sio_io_open)
+        return;
+    if (!sio_default_io_open)
+        sio_default_io_open = fmt->io_open;   /* avformat_alloc_context's default, the same for every context */
+    if (fmt->io_open == sio_default_io_open)
+        fmt->io_open = sio_io_open;
+}
+
 void evo_stream_io_apply_network_options(AVDictionary **opts, const char *url)
 {
 #ifdef NUVIO_APP
@@ -415,6 +462,8 @@ int evo_stream_io_open(const char *path,
     }
     fmt->interrupt_callback.callback = sio_interrupt_cb;
     fmt->interrupt_callback.opaque   = ctx;
+    if (ctx->is_network)
+        evo_stream_io_install_io_open(fmt);   /* JELLY5_RCVBUF_V2: HLS segment connections too */
     /* A playlist open is genuinely longer - the master, a variant, and the first
      * segment all load before it returns - and a slow origin can spend ten seconds
      * on them. It keeps the full budget; the reconnect loop that used to burn it
