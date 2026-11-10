@@ -116,7 +116,7 @@ The same work fixed what the server sends, in that stack and not in this app: ti
 
 ### Install
 
-1. Get the app's zip and unzip it. Inside is a folder called `PPSA99505`. **This fork has no release download yet:** build it from the `iptv-live-tv` branch (see [Building](#building)) to get these Live TV changes. Upstream's [releases](https://github.com/02dnot/Jelly5/releases) are the unpatched app.
+1. Get the app's zip and unzip it. Inside is a folder called `PPSA99505`. **This fork has no release download yet:** build it (see [Building](#building)) to get these Live TV changes. Upstream's [releases](https://github.com/02dnot/Jelly5/releases) are the unpatched app.
 2. Start the jailbreak with ShadowMount+ (and your FTP server, if you use FTP).
 3. Upload the `PPSA99505` folder to `/data/homebrew/` on the console, so that `/data/homebrew/PPSA99505/eboot.bin` exists. Create `/data/homebrew` first if it isn't there.
 4. After a moment, ShadowMount+ adds a **Jelly5** tile under *Media* on the home screen. If it doesn't, run your payloads again, or reboot and jailbreak again.
@@ -240,7 +240,7 @@ scripts/build.sh --release                  # → build/app/Jelly5-<version>.zip
 
 On macOS, run the build with Homebrew's bash: `"$(brew --prefix)/bin/bash" scripts/build.sh`.
 
-This fork's changes are on the `iptv-live-tv` branch: check it out before building. `JELLY5_AVDIAG=1 scripts/build.sh` makes the diagnostic build described above (not for everyday use).
+This fork's changes are on `main` (and on the `iptv-live-tv` branch they were made on). `JELLY5_AVDIAG=1 scripts/build.sh` makes the diagnostic build described above (not for everyday use).
 
 A plain `scripts/build.sh` is a development build: it reads the git-ignored `.env.local` (`JF_URL`, `PS5_HOST`, …), uses `JF_URL` as the default server, and sends a debug log over UDP to the build machine (`scripts/log.sh`). `scripts/deploy.py` uploads it to the console over FTP.
 
