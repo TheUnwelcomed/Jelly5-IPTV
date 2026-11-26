@@ -1,7 +1,7 @@
 <p align="center">
   <img src="docs/media/icon.png" alt="Jelly5" width="180"><br>
-  <b>A native Jellyfin and Emby client for jailbroken PS5 consoles.</b><br>
-  Its own GPU-drawn interface, hardware-decoded 4K HDR playback, and no browser in between.
+  <b>Jelly5-IPTV — Jelly5 for jailbroken PS5 consoles, tuned for Live TV over long IPTV paths.</b><br>
+  The same native Jellyfin and Emby client, with player fixes measured on a real IPTV stack.
 </p>
 
 <p align="center">
@@ -10,6 +10,7 @@
   <img alt="Emby" src="https://img.shields.io/badge/Emby-client-52b54b">
   <img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-555">
   <img alt="Status: early" src="https://img.shields.io/badge/status-early%20release-c06">
+  <img alt="Fork of Jelly5 0.8.0+" src="https://img.shields.io/badge/fork%20of-Jelly5%200.8.0%2B-7b5cd6">
 </p>
 
 <p align="center">
@@ -29,9 +30,43 @@
   </tr>
 </table>
 
+**Jelly5-IPTV is a fork of [Jelly5](https://github.com/02dnot/Jelly5) by 02dnot**, made by TheUnwelcomed, for Live TV that reaches the PS5 over a long path: a Jellyfin server with an IPTV (Xtream/M3U) feed on a remote host, about 130 ms and a few Mbit/s of headroom away. On that path stock Jelly5 0.7.0 capped every connection at about 8 Mbit/s, froze the picture for 7–14 s after a dropped connection, left the picture 0.4 s behind the sound after a reconnect, and could restart a channel from the beginning during a provider's pause. The fork began as Jelly5 0.7.0 with seven changes to its player, each found by measuring and checked the same way afterwards. Five of them are in Jelly5 itself now ([below](#already-in-jelly5)); this fork is Jelly5's `main` with the two that are not. Everything else is upstream Jelly5, unchanged.
+
 Jelly5 brings your Jellyfin or Emby library to the PS5 as a real app: a fast, sharp interface made for the TV, and 4K HDR video played by the console's own hardware. With [Seerr](https://github.com/seerr-team/seerr), you can also request new films and series without leaving the couch.
 
-**Contents:** [Features](#features) · [Installation](#installation) · [Controls](#controls) · [Emby](#emby) · [Seerr](#seerr-optional) · [Formats and limits](#formats-and-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Building](#building) · [Credits](#credits)
+**Contents:** [What's different](#whats-different-from-jelly5) · [How it was found](#how-it-was-found) · [Features](#features) · [Installation](#installation) · [Controls](#controls) · [Emby](#emby) · [Seerr](#seerr-optional) · [Formats and limits](#formats-and-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Building](#building) · [Credits](#credits)
+
+## What's different from Jelly5
+
+Jelly5's `main` of 2026-11-26 (after 0.8.0) plus two changes, both in the player and its media engine. Each is marked in the code with its tag, and each commit message carries the measurement behind it.
+
+| Tag | What it changes | What it fixed, as measured |
+| --- | --- | --- |
+| `JELLY5_AVLATE_V1/V2/V3` | A picture that has been more than 0.15 s behind the sound for 0.35 s is skipped and the next decoded at once. V3: two in a row, then one shown (the picture on screen is the decoder's own memory, and a longer run overwrote it); the skipping stands down when the pictures cannot come faster than the sound plays (a decoder that cannot keep up, such as AV1 on the CPU) for 5 s, then longer each time; it waits while a jump in the sound's timestamps has not been heard yet; it starts over after a seek or a pause; and the presentation clock moves with the picture when a run ends, so what was gained is kept. | After a reconnect the picture stayed 0.4 s behind the sound for the next 18 minutes (−0.4 to −0.9 s after rebuffers); nothing else in Jelly5 brings it back. V2's 0.35-s hold stops false skips on 60 fps channels, whose sound clock moves in steps. V3 answers what Jelly5 left V1/V2 out for (1 picture in 13 with a slow decoder; no reset on a seek) and what a review of it found since, each checked in a model of the player (`app/tests/host/lateskip.sh`). **V3 has not been run on a console yet:** [the test](IPTV-PATCHES.md#console-test-for-v3). |
+| `JELLY5_AVDIAG_V1` | Opt-in diagnostic build (`JELLY5_AVDIAG=1 scripts/build.sh`): the engine's log on the console at `/data/evoplayer/jelly5-diag.log`, every 5 s with the console's clock, both media clocks and the offset between them as the player reads it, the late skips so far, and every starvation. | Not for a release build: the file grows while the app runs (~100 KB an hour). It is how the clock problems above were read from the player's side. |
+
+### Already in Jelly5
+
+Measured and fixed here first, then taken into Jelly5 on 2026-11-26 with TheUnwelcomed as their author. Jelly5's code is the same, with plain comments in place of the tags. Times are from the tests on the author's setup, 2026-10-17 → 10-19.
+
+| Tag | What it changes | What it fixed, as measured |
+| --- | --- | --- |
+| `JELLY5_RCVBUF_V1` | The player's stream connection asks for a 1 MB TCP receive buffer (set before connecting, so the window scale is negotiated for it). | The console's default ~128 KB window capped a connection at window ÷ round trip: 128 KB / 0.128 s ≈ 8 Mbit/s, under a 6.5–8.7 Mbit/s channel's peaks, so the player fell behind, froze and reconnected. The server was stalled by the PS5's window 8.6–10.3 s of every 30. After: the console grants 512 KB — window 511 KB, nothing queued, no time stalled, a ceiling of about 31 Mbit/s at that round trip. |
+| `JELLY5_RCVBUF_V2` | The same option on every connection FFmpeg's demuxer opens by itself: the HLS playlist, every segment, every refresh. | FFmpeg copies only a few options to those connections, so a server transcode's segments kept the 128 KB window (126–128 KB, ≤ 7.8 Mbit/s) and a 20 Mbit/s transcode failed like direct play. After: 511–513 KB on every segment connection, nothing queued. |
+| `JELLY5_AVCLOCK_V1` | The sound's clock follows a jump in the sound's timestamps (between 0.3 s and 120 s against the usual packet step). | After a dropped connection the stream picks up at the live edge; the sound clock only counted samples played, so the picture sat "early" and showed one frame every 1.5 s for 7–14 s with the sound running. |
+| `JELLY5_PPCLOCK_V1` | The presentation timeline re-anchors on a frame more than 100 ms early, or more than 800 ms late after nothing has been shown for that long. | After a sound jump the picture ran at about 10 frames a second with every second frame missing (4,009 frames skipped in 4.5 minutes); after a rebuffer the old recovery first dropped 20 frames. |
+| `JELLY5_HWWATCH_V1` | The hardware-decoder watchdog reopens on the software decoder only if a keyframe went in during its 6 silent seconds. | A reconnect lands mid-GOP; during a provider's pause the next keyframe was more than 6 s away, the watchdog declared the decoder dead, and the channel restarted from the beginning ("started and instantly restarted"). Jelly5 added a limit: 20 s with no picture reopens regardless, for a stream that never marks its keyframes. |
+
+[`IPTV-PATCHES.md`](IPTV-PATCHES.md) lists the same in short, with the console test for V3.
+
+## How it was found
+
+Jelly5-IPTV was built and tested by TheUnwelcomed against TheUnwelcomed's own live-TV stack: a Jellyfin 10.11.4 server with an Xtream IPTV feed, a stream proxy, ffmpeg wrappers and monitoring tools, all on a shared, rootless host (the private Unwelcomed-IPTV project), with the PS5 at home about 130 ms away, on Wi-Fi and on a cable. That stack's tools did the measuring:
+
+- **From the server side**, its live-TV monitor read every connection to the PS5 from the kernel — receive window, round trip, retransmits, time the server was stalled by the receiver, what was queued — and the stream's own timestamps. That is how the 128 KB window was found, and how each fix was checked afterwards.
+- **From the player's side**, the diagnostic build's log (`JELLY5_AVDIAG_V1`) gave the console's clocks, lined up second by second with the server's logs.
+
+The same work fixed what the server sends, in that stack and not in this app: timestamps kept continuous when the provider's connection is replaced, a PS5 that joins a running channel getting its sound with its picture, and a provider's replayed buffer no longer sent twice. Jelly5-IPTV is the client half: it is useful with any Jellyfin or Emby server, and most where the path is long.
 
 ## Features
 
@@ -88,7 +123,7 @@ Jelly5 brings your Jellyfin or Emby library to the PS5 as a real app: a fast, sh
 
 ### Install
 
-1. Download `Jelly5-<version>.zip` from the [latest release](../../releases/latest) and unzip it. Inside is a folder called `PPSA99505`.
+1. Get the app's zip and unzip it. Inside is a folder called `PPSA99505`. **This fork has no release download yet:** build it (see [Building](#building)) to get these Live TV changes. Upstream's [releases](https://github.com/02dnot/Jelly5/releases), up to 0.8.0, have none of them.
 2. Start the jailbreak with ShadowMount+ (and your FTP server, if you use FTP).
 3. Upload the `PPSA99505` folder to `/data/homebrew/` on the console, so that `/data/homebrew/PPSA99505/eboot.bin` exists. Create `/data/homebrew` first if it isn't there.
 4. After a moment, ShadowMount+ adds a **Jelly5** tile under *Media* on the home screen. If it doesn't, run your payloads again, or reboot and jailbreak again.
@@ -166,7 +201,7 @@ Once signed in, Seerr's results appear in Search, a *Discover* tab shows what's 
 | Audio | AAC, AC3, E-AC3, TrueHD, DTS (incl. DTS-HD MA), FLAC, Opus, MP3 and more | Played as multichannel PCM; with *HDMI bitstream* on, Dolby Digital, Dolby Digital Plus and DTS go to the TV/receiver as they are (TrueHD and DTS-HD MA stay lossless PCM) |
 | Subtitles | SRT, ASS/SSA, PGS, DVD and DVB, WebVTT | Embedded or external |
 | Containers | MKV, MP4, TS/M2TS, AVI and more | No Blu-ray folders or ISO files |
-| Live TV | Channels from the server's tuners (IPTV/M3U, HDHomeRun) as MPEG-TS or HLS | Played directly where the PS5 can; interlaced (1080i, 576i) and MPEG-2 channels are deinterlaced and converted by the server. No pausing back in time (timeshift) |
+| Live TV | Channels from the server's tuners (IPTV/M3U, HDHomeRun) as MPEG-TS or HLS | Played directly where the PS5 can; interlaced (1080i, 576i) and MPEG-2 channels are deinterlaced and converted by the server. No pausing back in time (timeshift). This fork: the late-picture skip above (the receive-buffer and clock changes are in Jelly5 now); tested with Jellyfin 10.11.4 |
 
 Limits of the platform, not of Jelly5:
 
@@ -184,12 +219,13 @@ Limits of the platform, not of Jelly5:
 | Your server isn't listed | Type its address. Discovery needs UDP port 7359; in Docker, publish `7359/udp`, and in Jellyfin turn on *Enable auto discovery*. |
 | No previews when scrubbing | The server makes them. Jellyfin: turn on *Enable trickplay image extraction* in the library and run *Generate Trickplay Images*. Emby: turn on *Thumbnail image extraction*. |
 | A title won't play or stutters | Press **L3** while it plays and include that info in an issue. Over Wi-Fi, lower *Maximum quality* in the settings. |
+| Live TV freezes, restarts or drifts out of sync on a long path | The changes above, this fork's and those now in Jelly5, address the cases measured. If it still happens, build with `JELLY5_AVDIAG=1` and include the console's log and the time of the problem. |
 | The receiver shows PCM, not Dolby or Atmos | Turn on *Settings → HDMI bitstream* (and night mode off). TrueHD and DTS-HD MA always play as PCM: see *Formats and limits*. |
 | Seerr isn't answering | Use Seerr's local address (port 5055 by default) and check it with *Test connection*. |
 | Seerr's automatic sign-in fails | Seerr is older than 3.4, Quick Connect is off in Jellyfin, or your user isn't in Seerr. Use your password instead, or import the user. |
 | Seerr shows no pictures | Jelly5 loads them through Seerr's image cache, so the Seerr server needs to reach image.tmdb.org and write its cache, and a reverse proxy must pass `/imageproxy` as well as `/api`. *Test connection* shows whether they come through. Or turn on *Pictures straight from TMDB*. |
 
-**Reporting a problem:** open an issue with your firmware, your server and its version, what you did and what happened. For playback problems, the L3 playback info helps a lot.
+**Reporting a problem:** open an issue with your firmware, your server and its version, what you did and what happened. For playback problems, the L3 playback info helps a lot. For Live TV on a long path, add the approximate round trip to the server and whether the problem is buffering, a freeze after a drop, or sound and picture apart.
 
 ## Privacy
 
@@ -211,6 +247,8 @@ scripts/build.sh --release                  # → build/app/Jelly5-<version>.zip
 
 On macOS, run the build with Homebrew's bash: `"$(brew --prefix)/bin/bash" scripts/build.sh`.
 
+This fork's changes are on `main`, on Jelly5's `main` of 2026-11-26. The first versions, all seven on Jelly5 0.7.0, stay on the `iptv-live-tv` branch. `JELLY5_AVDIAG=1 scripts/build.sh` makes the diagnostic build described above (not for everyday use).
+
 A plain `scripts/build.sh` is a development build: it reads the git-ignored `.env.local` (`JF_URL`, `PS5_HOST`, …), uses `JF_URL` as the default server, and sends a debug log over UDP to the build machine (`scripts/log.sh`). `scripts/deploy.py` uploads it to the console over FTP.
 
 Tests run on the build machine (they need libcurl's headers: `libcurl4-openssl-dev` on Debian/Ubuntu, included with macOS):
@@ -218,10 +256,13 @@ Tests run on the build machine (they need libcurl's headers: `libcurl4-openssl-d
 - `app/tests/host/run.sh`: the client against your Jellyfin server (`JF_URL`, `JF_USER`, `JF_PASS` in `.env.local`); `run.sh emby` against Emby (`EMBY_URL`, `EMBY_USER`, `EMBY_PASS`)
 - `app/tests/host/seerr.sh`: the Seerr client (`SEERR_URL`); it sends no request unless given `--for-real`
 - `app/tests/host/routes.sh`: no server needed; checks that every Jellyfin request is the same as on `main`
+- `app/tests/host/lateskip.sh`: no server needed; the late-picture skip, by hand and in a model of the decoder, the sound clock and the presentation clock
 
 ## Credits
 
-Jelly5 stands on the work of others in the PS5 scene and beyond:
+**Jelly5-IPTV — TheUnwelcomed.** The Live TV changes above, found, measured and tested on TheUnwelcomed's own Jellyfin IPTV stack, shared host and PS5, built with the tools of that stack; five of them are in Jelly5 now. The patches were written with Claude (Anthropic); their commits say so.
+
+**[Jelly5](https://github.com/02dnot/Jelly5) — 02dnot**, the app this fork is built on. Jelly5 stands on the work of others in the PS5 scene and beyond:
 
 - **[Nuvio PS5](https://github.com/theghostonline/Nuvio-PS5)** by Husam Osman: the native player, its session and subtitle handling, and the app packaging toolkit
 - **[EVO Player](https://github.com/sainsaji/EVO-PLAYER-PS5)**: the media engine (demuxing, `sceVideodec2`, the AGC renderer, audio, HDR), shader tooling and much of what is known about the PS5's GPU from user space
@@ -236,7 +277,7 @@ Every component, its licence and where it is used are listed in [`THIRD_PARTY_NO
 
 ## License
 
-Jelly5 is free software under the **GNU General Public License v3.0 or later** (see [`LICENSE`](LICENSE)). Code taken from Nuvio PS5, EVO Player and other projects keeps its original notices.
+Jelly5 is free software under the **GNU General Public License v3.0 or later** (see [`LICENSE`](LICENSE)). Code taken from Nuvio PS5, EVO Player and other projects keeps its original notices. Jelly5-IPTV is a modified version under the same licence: its changes (2026-10-17 → 11-26) are listed in [What's different](#whats-different-from-jelly5) and marked in the code with their `JELLY5_…` tags.
 
 ## Disclaimer
 
