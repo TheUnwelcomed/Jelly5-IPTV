@@ -33,6 +33,7 @@
 #include "evo_audio_out.h"
 #include "evo_direct_mem.h"
 #include "evo_boot_trace.h"   /* JELLY5_AVLATE_V1: one line per catch-up */
+#include "evo_late_skip.h"    /* JELLY5_AVLATE_V3: the decision itself */
 
 #ifndef SCREEN_PLAYER
 #define SCREEN_PLAYER 2
@@ -75,6 +76,12 @@ double first_video_pts_seconds = -1.0;
 double video_clock_seconds = 0.0;
 /* JELLY5_AVLATE_V1: pictures not shown because they were late against the sound */
 volatile long long video_late_skips = 0;
+/* JELLY5_AVLATE_V3: what the late-picture skip remembers between pictures (the video
+ * thread only). Starts as evo_late_skip_reset() leaves it. */
+static evo_late_skip g_late_skip = {
+    .late_since = -1.0, .last_step = -1.0, .pts0 = INT64_MIN,
+    .quiet_s = EVO_LATE_SKIP_QUIET_S, .shift_mark = -1,
+};
 /* Keyframes handed to the decoder: a silent hardware decoder that has not
  * been given one yet is waiting, not broken. */
 volatile long long video_keys_sent = 0;
@@ -523,7 +530,7 @@ static void prospero_video_queue_drain_nonkey(int max_packets)
 
 
 
-static double evo_mono_s(void)   /* JELLY5_AVLATE_V2 */
+static double evo_mono_s(void)   /* JELLY5_AVLATE_V2: a clock for the late-picture skip */
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -591,8 +598,13 @@ int decode_next_video_frame(void)
              */
             if (pf.pts_us != INT64_MIN && !seek_discarding) {
                 video_clock_seconds = (double)pf.pts_us / 1000000.0;
-                if (first_video_pts_seconds < 0.0)
+                if (first_video_pts_seconds < 0.0) {
                     first_video_pts_seconds = video_clock_seconds;
+                    /* JELLY5_AVLATE_V3: the first picture after an open or a seek
+                     * (both put first_video_pts_seconds back to -1) - what the
+                     * late-picture skip read on the old timeline is void. */
+                    evo_late_skip_reset(&g_late_skip);
+                }
             }
 
             video_rel = 0.0;
@@ -649,55 +661,45 @@ int decode_next_video_frame(void)
                 if (behind > 0.45 && !g_pp_pb.active)
                     prospero_video_queue_drain_nonkey(24);
                 /*
-                 * JELLY5_AVLATE_V1. Below the drain threshold a late picture was
-                 * simply shown, and the presentation clock after this gate runs
-                 * on wall time, so after a stall, a skip or a rebuffer hold the
-                 * picture settled a few tenths of a second behind the sound and
-                 * stayed there (2026-10-18: -0.43 s for 18 minutes after a
-                 * reconnect; -0.4 to -0.9 s after rebuffers the day before). A
-                 * picture late by more than LATE_SKIP_S is not shown: the next
-                 * one is decoded at once, so the picture catches up within a few
-                 * frames instead of never. At most LATE_SKIP_MAX in a row, so a
-                 * sound clock that runs away cannot blank the picture.
+                 * JELLY5_AVLATE_V3. Nothing above or in pp_clock brings a picture
+                 * that has settled behind the sound back to it: this gate only
+                 * waits for the sound, the drain is off while g_pp_pb is active,
+                 * and pp_clock paces against wall time. So such a picture is not
+                 * shown and the next one is decoded at once, until the picture
+                 * is back with the sound. When a picture counts as late, and
+                 * when skipping stands down because it cannot gain on the sound
+                 * (a decoder that cannot keep up), is in evo_late_skip.h.
                  */
-                /*
-                 * JELLY5_AVLATE_V2. The sound clock advances when a block is
-                 * handed to the port, and the port takes several at once, so
-                 * the clock steps forward in bursts of up to ~0.2 s and stands
-                 * still between them (2026-10-19 01:33, 60 fps HE-AAC: the gate
-                 * read 0.10-0.11 s late once every ~6 frames and skipped a frame
-                 * each time, 10 a second, with the picture in sync). A picture
-                 * counts as late only when it has read late without a break for
-                 * LATE_SKIP_HOLD_S - longer than a burst period - so the steps
-                 * never trip it, while a real offset (always late) does.
-                 */
-                #define LATE_SKIP_S      0.15
-                #define LATE_SKIP_HOLD_S 0.35
-                #define LATE_SKIP_MAX    12
                 {
-                    static int s_streak = 0;
-                    static double s_worst = 0.0;
-                    static double s_late_since = -1.0;
+                    static const char *const why_said[] = {
+                        "", " - cut short by a pause or a hold", " - cut short by a jump in the sound's timestamps",
+                    };
+                    evo_late_skip_note note;
                     const double now_mono = evo_mono_s();
-                    if (behind > LATE_SKIP_S) {
-                        if (s_late_since < 0.0)
-                            s_late_since = now_mono;
-                    } else {
-                        s_late_since = -1.0;
-                    }
-                    if (behind > LATE_SKIP_S && s_streak < LATE_SKIP_MAX &&
-                        (s_streak > 0 || now_mono - s_late_since >= LATE_SKIP_HOLD_S)) {
-                        s_streak++;
+                    /* rule 5: a jump in the sound's timestamps is in the clock before it is heard */
+                    const int settled = evo_late_skip_sound_settled(&g_late_skip, audio_clock_shift,
+                                                                    audio_samples_decoded,
+                                                                    audio_samples_played, now_mono);
+                    const int skip = evo_late_skip_step(&g_late_skip, behind, pf.pts_us,
+                                                        video_fps > 1.0 ? 1.0 / video_fps : 0.04,
+                                                        (double)evo_audio_play_speed(), settled,
+                                                        now_mono, &note);
+                    /* rule 6: the run moved the picture up to the sound and pp_clock's
+                     * timeline is where it was; left there, the picture would wait
+                     * the gain away and the skipping start over. The timeline goes
+                     * on the picture that is about to be shown. */
+                    if (note.reanchor && g_pp_pb.active && g_pp_pb.clock.started &&
+                        pf.pts_us != INT64_MIN && !pp_clock_is_paused(&g_pp_pb.clock))
+                        pp_clock_reanchor(&g_pp_pb.clock, pf.pts_us);
+                    if (note.what == EVO_LATE_NOTE_ENDED)
+                        evo_bt("nuvio: picture was %.2f s behind the sound - %d frame(s) skipped to catch up (now %+.2f s)%s",
+                               note.worst_s, note.skipped, -behind, why_said[note.why]);
+                    else if (note.what == EVO_LATE_NOTE_STOOD_DOWN)
+                        evo_bt("nuvio: picture %.2f s behind the sound, but pictures come at %.1fx - %d frame(s) skipped, no skipping for %.0f s",
+                               note.worst_s, note.rate, note.skipped, note.quiet_s);
+                    if (skip) {
                         video_late_skips++;
-                        if (behind > s_worst)
-                            s_worst = behind;
                         return 1;              /* the frame stays unshown; the next call decodes the next */
-                    }
-                    if (s_streak) {
-                        evo_bt("nuvio: picture was %.2f s behind the sound - %d frame(s) skipped to catch up (now %+.2f s)",
-                               s_worst, s_streak, -behind);
-                        s_streak = 0;
-                        s_worst = 0.0;
                     }
                 }
             } else if (video_fps > 1.0 && !g_pp_pb.active) {
