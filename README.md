@@ -237,6 +237,7 @@ Jelly5 builds on macOS (Apple silicon or Intel) and Linux with the [PS5 payload 
 
 - **macOS**: `brew install llvm lld coreutils bash nasm meson ninja pkgconf` (the system's bash 3.2 is too old for the build script).
 - **Linux** (Debian/Ubuntu): `sudo apt install build-essential clang lld llvm curl unzip zip python3-venv nasm meson ninja-build pkg-config`. clang, lld and llvm must be the same version (tested with LLVM 21); set `LLVM_CONFIG` (e.g. `llvm-config-21`) if several are installed.
+- **A shared Linux host with no root** (Ubuntu 22.04, such as a seedbox): `bash scripts/build-on-shared-host.sh` from the clone does all of it. LLVM 18, nasm, meson and ninja go under your home folder, every compile runs 4 at a time at the lowest priority, and it makes the diagnostic test build (`DIAG=0` for a plain one). Its top comment says what it does and why.
 
 ```sh
 scripts/setup-toolchain.sh                  # once: SDK, pacbrew sysroot, host zlib, AV1 (dav1d + FFmpeg 7.1)

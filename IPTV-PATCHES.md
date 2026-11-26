@@ -37,6 +37,9 @@ what happened:
 JELLY5_AVDIAG=1 app/scripts/build.sh
 ```
 
+On a shared host with no root, `bash scripts/build-on-shared-host.sh` makes this build, with everything it needs
+put under your home folder.
+
 Close Jelly5 with the PS button before deploying. The log is `/data/evoplayer/jelly5-diag.log` (over
 FTP). What to read in it:
 
